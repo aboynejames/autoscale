@@ -9,15 +9,17 @@
 * @version    $Id$
 */
 var util = require('util');
+var fs = require('fs');
 var events = require("events");
 var kad = require('kad');
 var traverse = require('kad-traverse');
 var KadLocalStorage = require('kad-localstorage');
+var messageFiles = require('kad-fs');
 var crypto = require('crypto');
 var getIP = require('external-ip')();
 
 var KAD = function() {
-console.log('KAD setup network');
+
   this.dht = {};
   this.ipPublic = '';
 	events.EventEmitter.call(this);
@@ -39,15 +41,15 @@ util.inherits(KAD, events.EventEmitter);
 KAD.prototype.getpublicIP = function() {
 
   var localthis = this;
-  var ip = '';
-/*  var setIP = getIP;
-  setIP(function (err, ip) {
-    if (err) {
+  var ip = '127.0.0.1';
+//  var setIP = getIP;
+ // setIP(function (err, ip) {
+  //  if (err) {
         // every service in the list has failed
-        throw err;
-    }*/
+   //     throw err;
+    //}
 console.log('extippp' + ip);
-    localthis.ipPublic = '127.0.0.1';
+    localthis.ipPublic = ip;
   //});
 
 };
@@ -58,22 +60,93 @@ console.log('extippp' + ip);
 *
 */
 KAD.prototype.startDHT = function(portIn) {
-console.log('startDHT FUNCTION ClassS')
-
+/*
   var ipaddress =  this.ipPublic;
   // Decorate your transport
-  this.dht = new kad.Node({
-    transport: kad.transports.UDP(kad.contacts.AddressPortContact({
-      address: '127.0.0.1',
-      port: portIn
+//console.log('exterip pickedup == ' + ip + 'and port== ' + portnumber);
+  // Create your contact
+  var contact = kad.contacts.AddressPortContact({
+    address: ipaddress,
+    port: 8816//portnumber
+  });
+  // Decorate your transport
+  var NatTransport = traverse.TransportDecorator(kad.transports.UDP);
 
-    })),
+  // Create your transport with options
+  var transportlive = new NatTransport(contact, {
+  traverse: {
+    upnp: { forward: 1901,
+                ttl: 0 },
+    stun: { address: 'stun.services.mozilla.com',
+                 port: 3478 },
+    turn: { address: 'turn.counterpointhackers.org',
+                 port: 3478 }
+  }
+  });
+
+  this.dht = new kad.Node({
+    transport: transportlive,
     storage: kad.storage.FS('datadir'),
     validator: 'somethingtocheck'
     //storage: new KadLocalStorage('label')
   });
-console.log('----dht--- for this peer');
-console.log(this.dht);
+*/
+// local DHT network setup
+var ipaddress =  this.ipPublic;
+// Decorate your transport
+this.dht = new kad.Node({
+  transport: kad.transports.UDP(kad.contacts.AddressPortContact({
+    address: '127.0.0.1',
+    port: portIn
+
+  })),
+  storage: kad.storage.FS('datadir'),
+  validator: 'somethingtocheck'
+  //storage: new KadLocalStorage('label')
+});
+//console.log('----dht--- for this peer');
+//console.log(this.dht);
+
+};
+
+/**
+*  get a list of all current messages
+* @method listLocalMessages
+*
+*/
+KAD.prototype.listLocalMessages = function() {
+
+// try and read all message files in directory
+  var localthis = this;
+  var testlstore = new messageFiles('./datadir');
+  var listfiles = '';
+
+  setInterval(function(){
+    listfiles = testlstore.createReadStream();
+    var returmesfiledata = [];
+    // every time "data" is read, this event fires
+    listfiles.on('data', function(textData) {
+
+      localthis.emit("newMfile", textData.value);
+      // remove messge from this directory
+      if(textData.key)
+      {
+        var livetextfile = './datadir/' + textData.key;
+        var moveoldstring = './oldmessages/' + textData.key;
+        fs.rename(livetextfile, moveoldstring, function (err) {
+          if (err) throw err;
+          console.log('Move complete.');
+        });
+      }
+
+    });
+
+      // the reading is finished...
+      listfiles.on('close', function (textData) {
+
+      });
+
+	}	,14000)
 
 };
 
@@ -83,25 +156,23 @@ console.log(this.dht);
 *
 */
 KAD.prototype.seedSingle = function(seedIn) {
-console.log('seed single');
-console.log(seedIn);
-  //console.log(seedIn);
-    var localthis = this;
-    var hashkey = crypto.createHash('md5').update(seedIn.sendmessage).digest('hex');
 
-    var seed = {
-      address: seedIn.ip,
-      port: seedIn.port
-    };
-  //console.log(seed);
-    var localthis = this;
-    this.dht.connect(seed, function(err) {
-  //console.log('begin seed connection');
-      var key = hashkey;
-      var message = seedIn.sendmessage;
-      localthis.putMessage(key, message);
+  var localthis = this;
+  var hashkey = crypto.createHash('md5').update(seedIn.sendmessage).digest('hex');
 
-    });
+  var seed = {
+    address: seedIn.ip,
+    port: 8816
+  };
+//console.log(seed);
+  var localthis = this;
+  this.dht.connect(seed, function(err) {
+//console.log('begin seed connection');
+    var key = hashkey;
+    var message = seedIn.sendmessage;
+    localthis.putMessage(key, message);
+
+  });
 
 };
 
@@ -112,8 +183,7 @@ console.log(seedIn);
 *
 */
 KAD.prototype.putMessage = function(keyID, message) {
-console.log('put message');
-console.log(message);
+
   var keymid = keyID;
   if(keyID.length == 0)
   {
@@ -133,64 +203,49 @@ console.log('sent message to peers');
 *
 */
 KAD.prototype.getMessage = function(keyID) {
-console.log('get read message');
 
       var key = keyID;
       var info = '';
       this.dht.get(key, function(err, info) {
 console.log('successfully read message');
-console.log(info);
+
       });
 
 };
-
 /**
 *  Single hop across the peers
 * @method oneHop
 *
 */
-KAD.prototype.oneHop = function(keyID) {
+KAD.prototype.oneHop = function(cDmapIN, nodeClass) {
 console.log('oneHope select a buck IP start of random walk');
-  var nodebuckets = this.dht._router.hopBucketlist();
-console.log(nodebuckets);
+  var localthis = this;
+  var nodebuckets = nodeClass._router.hopBucketlist();
     var sizebucketsobject = Object.keys(nodebuckets).length;
-console.log('length ie no buckets.'+ sizebucketsobject);
+
     // send message to IP node Protocol and then let the protocol go through the Sampling and scoring.
     // needs instant if Dmap Contract and ....
     var hoplist = [];
     var nodelist = [];
     var combinelist = [];
     var bucks = Object.keys(nodebuckets);
-console.log('keys of buckets');
-console.log(bucks);
+
     bucks.forEach(function(buc) {
-console.log(buc);
-console.log(nodebuckets[buc]);
+
       var bcont = Object.keys(nodebuckets[buc]);
-console.log(Object.keys(nodebuckets[buc]));
+
         bcont.forEach(function(bc) {
-//console.log(bc);
-//console.log(nodebuckets[buc][bc]);
+
           var contacts = nodebuckets[buc][bc];
-//console.log('contact array?')
-//console.log(contacts);
+
           contacts.forEach(function(cont) {
-//console.log('each contact details address and port');
-//console.log(cont);
+
             var localcont = {};
             localcont = cont;
-console.log('local connt');
-console.log(localcont);
-console.log(Object.keys(localcont));
             var address = Object.keys(localcont);
-//console.log(address);
             var tempholder = [];
             address.forEach(function(item) {
 
-console.log(item);
-console.log('after item');
-console.log(localcont[item]);
-console.log(item.port);
             if(item == 'port')
             {
               hoplist.push(localcont[item]);
@@ -205,24 +260,21 @@ console.log(item.port);
           });
         });
     });
-console.log(hoplist);
-console.log('idlist');
-console.log(nodelist);
-console.log('cobmined');
-console.log(combinelist);
-
-
-
-var rand = hoplist[Math.floor(Math.random() * hoplist.length)];
-console.log('rand chosen');
-console.log(rand);
-      // send message to this peer, update dmap/sampling contract
-      // call smart contract
-      // send message to network id.
-
 
     });
-
+    var rand = nodelist[Math.floor(Math.random() * nodelist.length)];
+console.log('rand chosen');
+console.log(rand);
+    // send message to this peer, update dmap/sampling contract
+    var samplingMessage = {};
+    samplingMessage.type = 'Dsampling';
+    samplingMessage.text = 'chosen';
+    samplingMessage.DmapID = cDmapIN;
+    samplingMessage.nodeID = rand;
+    var serialiseDmessage = JSON.stringify(samplingMessage);
+    // send message to network id.
+    this.putMessage('', serialiseDmessage, nodeClass)
+    // call smart contract
     // POLICY WHAT IS THE properties to get a 'random' walk  one hope two hopes, select, jump over, statifed etc.
 };
 

@@ -4,49 +4,144 @@
 *
 **/
 pragma solidity ^0.4.6;
-//import './sampling-contract.sol' as samplingContract;
 
 contract DmapContract {
 
- struct Mapdetail {
+  address peer;
 
-    string mname;
-    string mcodehash;
-    string mppsample;
-    string mppscience;
-  }
+  struct Mapdetail {
 
-   struct Mappers {
-
-    uint maverage;
-    uint mppmscore;
-
-  }
-
-   mapping (address => Mappers)  mappershare;
-   Mapdetail mapdetail;
-
-  function setMappingDetail (string x) {
-
-     mapdetail.mname = x;
+    string dmname;
+    string dmdescription;
+    string dmcode1;
+    string dmcode2;
+    string dmcode3;
+    string mcodehash1;
+    string mcodehash2;
 
   }
 
-  function setCodeHash (string x) {
+  struct DMdatamodel {
 
-    mapdetail.mcodehash = x;
-
-  }
-
-  function setMappingDetailsample (string x) {
-
-   mapdetail.mppsample = x;
+    address datamodelscid;
 
   }
 
-  function setMappingDetailscience (string x) {
+  struct Dsampling {
 
-   mapdetail.mppscience = x;
+    address dcomputescid;
+
+  }
+
+  struct Dpeerlist {
+
+    uint invitesent;
+    address storagecontract;
+
+  }
+
+
+  uint sampleCount;
+  uint listCount;
+  uint acceptlistCount;
+
+  struct predPath {
+
+    string ppath1;
+    string ppath2;
+    string ppath3;
+
+  }
+
+  struct Dscoring {
+
+    uint outcomescore;
+    uint scoredate;
+
+  }
+
+  Mapdetail public liveDmapinfo;
+  DMdatamodel public liveDatamodel;
+  mapping(address => Dsampling) public liveSample;
+  mapping(address => Dpeerlist) public livePeerlist;
+  mapping(address => predPath) public livePrection;
+  mapping(address => Dscoring) public liveScoring;
+
+   // Constructor
+   function DmapContract(){
+
+       peer = msg.sender;
+       sampleCount = 0;
+       listCount = 0;
+       acceptlistCount = 0;
+
+   }
+
+  function setMappingDetail (string x, string y) {
+
+    liveDmapinfo.dmname = x;
+    liveDmapinfo.dmdescription = y;
+
+  }
+
+  function setMappingDetailcodeurl (string za, string zb, string zc) returns (bool) {
+
+    liveDmapinfo.dmcode1 = za;
+    liveDmapinfo.dmcode2 = zb;
+    liveDmapinfo.dmcode3 = zc;
+
+    return true;
+
+  }
+
+  function setMappingDetailcodehash (string zf, string zg) returns (bool) {
+
+    liveDmapinfo.mcodehash1 = zf;
+    liveDmapinfo.mcodehash2 = zg;
+
+    return true;
+
+  }
+
+  function setDataModel (address dataMscid) {
+
+    liveDatamodel.datamodelscid = dataMscid;
+
+  }
+
+  function setDsampling (address dcompute) {
+
+    liveSample[msg.sender].dcomputescid = 1;//dcompute;
+    sampleCount += 1;
+
+  }
+
+  function setPeerInvite (address invited) {
+
+    livePeerlist[invited].invitesent = 1;
+    listCount += 1;
+
+  }
+
+  function setPeerInviteStorageAddress (address storagesc) {
+
+    livePeerlist[msg.sender].storagecontract = storagesc;
+    acceptlistCount += 1;
+
+  }
+
+  function setPredpath (string ppath1, string ppath2, string ppath3) {
+
+    livePrection[msg.sender].ppath1 = ppath1;
+    livePrection[msg.sender].ppath2 = ppath2;
+    livePrection[msg.sender].ppath3 = ppath3;
+
+  }
+
+  function setDscoring (uint score) {
+
+    liveScoring[msg.sender].outcomescore = score;
+    liveScoring[msg.sender].scoredate = now;
 
   }
 
@@ -58,34 +153,72 @@ contract DmapContract {
 
   }
 
-  function getMname() constant returns(string) {
+  function getDmapDetail() constant returns(string dmn, string dmd, string dmc, string dme, string dmf) {
 
-   return mapdetail.mname;
-
-  }
-
-  function getMcodehash() constant returns(string) {
-
-   return mapdetail.mcodehash;
+   dmn = liveDmapinfo.dmname;
+   dmd = liveDmapinfo.dmdescription;
+   dmc = liveDmapinfo.dmcode1;
+   dme = liveDmapinfo.dmcode2;
+   dmf = liveDmapinfo.dmcode3;
 
   }
 
-  function getMsample() constant returns(string) {
+  function getDmapDetailchash() constant returns(string dmcid, string dmcidb) {
 
-   return mapdetail.mppsample;
-
-  }
-
-  function getMscience() constant returns(string) {
-
-   return mapdetail.mppscience;
+    dmcid = liveDmapinfo.mcodehash1;
+    dmcidb = liveDmapinfo.mcodehash2;
 
   }
 
-  function getMaverage(address addr) constant returns(uint) {
+  function getDataModel() constant returns(address dmscid) {
 
-    return 1;
+   dmscid = liveDatamodel.datamodelscid;
 
+  }
+
+  function getDsampling() constant returns(address chosenpeer) {
+
+    chosenpeer = liveSample[msg.sender].dcomputescid;
+
+  }
+
+  function getDpeerlist() constant returns(uint peerstatus) {
+
+    peerstatus = livePeerlist[msg.sender].invitesent;
+
+  }
+
+  function getDsamplingCount() constant returns(uint peercount) {
+
+    peercount = sampleCount;
+
+  }
+
+  function getDinviteCount() constant returns(uint peercount) {
+
+    peercount = listCount;
+
+  }
+
+  function getPredpath() constant returns(string path1, string path2, string path3) {
+
+    path1 = livePrection[msg.sender].ppath1;
+    path2 = livePrection[msg.sender].ppath2;
+    path3 = livePrection[msg.sender].ppath3;
+
+  }
+
+  function getDscoring() constant returns(uint score, uint scoredate ) {
+
+    score = liveScoring[msg.sender].outcomescore;
+    scoredate = liveScoring[msg.sender].scoredate;
+
+  }
+
+  function remove() {
+    if (msg.sender == peer){
+      selfdestruct(peer);
+    }
   }
 
 }

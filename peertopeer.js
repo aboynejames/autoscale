@@ -13,12 +13,15 @@ var events = require("events");
 var kadsetup = require('./kadsetup.js');
 var net = require('net');
 
-var peerTopeer = function() {
+var peerTopeer = function(nodesLIST, etherAPI) {
 console.log('peer to peer live class');
+	this.livenodes = nodesLIST;
+	this.liveEthereum = etherAPI;
 	events.EventEmitter.call(this);
 	this.livepublicIP = '';
+	this.liveethpk = '';
  	this.liveDHT = new kadsetup();
-	
+	this.startDHTkad(1111);
 
 };
 
@@ -40,13 +43,35 @@ peerTopeer.prototype.publicIPaddress = function() {
 };
 
 /**
+*  set ethereum public key for this client
+* @method setEthpk
+*
+*/
+peerTopeer.prototype.setEthpk = function(ekeyIN) {
+
+	this.liveethpk = ekeyIN;
+
+};
+
+/**
 *  connect to the DHT kad
 * @method startDHTkad
 *
 */
-peerTopeer.prototype.startDHTkad = function(pIn) {
+peerTopeer.prototype.startDHTkad = function(portIN) {
 
-	this.liveDHT.startDHT(pIn);
+	var localthis = this;
+	this.liveDHT.startDHT(portIN);
+	this.liveDHT.listLocalMessages();
+
+	this.liveDHT.on("newMfile", function(newFileIN) {
+
+		var newmessageunknown = newFileIN;
+		// filter per type of message
+		localthis.filterPtoPmessages(newmessageunknown);
+		newmessageunknown = '';
+
+	});
 
 };
 
@@ -55,14 +80,14 @@ peerTopeer.prototype.startDHTkad = function(pIn) {
 * @method seedDHTkad
 *
 */
-peerTopeer.prototype.seedDHTkad = function(seedDataIn) {
+peerTopeer.prototype.seedDHTkad = function() {
 
 	var seedData = {};
 	seedData.ip = '127.0.0.1';  // need list of peers
-	seedData.port = seedDataIn.port;
+	seedData.port = 8816;
 	var messagePtoP = {};
 	messagePtoP.type = 'join';
-	messagePtoP.text = 'welcome to Network';
+	messagePtoP.text = 'Welcome to Network';
 	var serialisemessage = JSON.stringify(messagePtoP);
 	seedData.sendmessage = serialisemessage;
 
@@ -75,19 +100,14 @@ peerTopeer.prototype.seedDHTkad = function(seedDataIn) {
 * @method seedDHTkad
 *
 */
-peerTopeer.prototype.sendmDHTkad = function(messageIN) {
+peerTopeer.prototype.sendmDHTkad = function(textIN) {
 
-	var messageData = {};
-	messageData.ip = '127.0.0.1';  // need list of peers
-	messageData.port = 0;
-	var messagePtoP = {};
-	messagePtoP.type = 'broadcast';
-	messagePtoP.text = messageIN[0];
-	var serialisemessage = JSON.stringify(messagePtoP);
-	messageData.sendmessage = serialisemessage;
-console.log('built oboject to send');
-console.log(messageData);
-	this.liveDHT.putMessage('', serialisemessage);
+	var seedData = [];
+	//seedData.push('127.0.0.1');  // need list of peers
+	//seedData.push(8816);
+	//seedData.push('hellow work meesgae');
+
+	this.liveDHT.putMessage('', textIN);
 
 };
 
@@ -104,13 +124,64 @@ peerTopeer.prototype.readmDHTkad = function() {
 };
 
 /**
+*  filter messages for peers and types
+* @method filterPtoPmessages
+*
+*/
+peerTopeer.prototype.filterPtoPmessages = function(messagePack) {
+
+
+		var localthis = this;
+	console.log('START OF FILTER MESSAGES package message ----------------');
+		var makeMessObj = JSON.parse(messagePack);
+	//console.log(makeMessObj);
+		var messContent = JSON.parse(makeMessObj.value);
+	//console.log(messContent.type);
+		//var messObject = JSON.parse(messContent);
+	//console.log(messContent.text);
+	//console.log(messContent.text.pubethk);
+	//console.log(messContent.nodeID);
+
+		// filter for this DHT ID node  type = 'Dsampling';
+		if(messContent.nodeID)
+		{
+	console.log('what is client node ID --SAMPLING PROTOCOL---');
+			// match to correct node instance and extract bucketlist and select a random nodeID
+			this.livenodes.forEach(function(singlenode) {
+				var localnode = singlenode;
+	console.log('single nodes=====================');
+	console.log(localnode._self.nodeID);
+	console.log(messContent.nodeID);
+				if(localnode._self.nodeID == messContent.nodeID)
+				{
+	console.log('identify match node ids ##########################');
+					localthis.liveEthereum.recallDmapContract("sample-chosen", messContent.DmapID, localnode);
+
+				}
+
+			});
+			// emit message event to ethereum API
+			//this.emit("sampling-selected", messContent.DmapID);
+
+		}
+		else if(messContent.type == 'join')
+		{
+	console.log('filter JOIN messaeg ============== message');
+			// pass on message to UI
+			//localthis.emit('client-message', messagePack);
+
+	}
+
+};
+
+/**
 *  Make a single hop across the DHT buckets
 * @method singleHop
 *
 */
-peerTopeer.prototype.singleHop = function() {
+peerTopeer.prototype.singleHop = function(cDmapIN, nodeclass) {
 
-	this.liveDHT.oneHop();
+	this.liveDHT.oneHop(cDmapIN, nodeclass);
 
 };
 
@@ -124,78 +195,12 @@ peerTopeer.prototype.dataEvent = function() {
 	var localthis = this;
 
 	setTimeout(function(){
-console.log('data eevent test');
+
 		localthis.emit("peerMessage", "peer");
 
 	}, 9200);
 
 };
 
-
-
-
-/**
-*  connect a peer via TCP
-* @method TCPconnect
-*
-*/
-peerTopeer.prototype.TCPconnect = function() {
-
-	// make method spec instance of this
-	var localthis = this;
-
-	setTimeout(function(){
-
-		var client = net.connect({port: 3334, host: '192.168.1.64' }, function() {
-		//var client = net.connect({port: 3333, host: '52.4.43.80' }, function() {
-console.log('connected to server OF PEER WINDOWS 64!');
-		});
-
-		client.on('data', function(data) {
-console.log(localthis);
-console.log('UBUNTU peer  INCOMING message: ');
-console.log(data.toString());
-			localthis.emit("peerMessage", data.toString());
-
-			//client.write('ubuntu client reply to listening server 64\r\n');
-			client.end();
-		});
-
-		client.on('end', function() {
-console.log('disconnected from server');
-		});
-
-
-	}, 9000);
-
-	process.on('uncaughtException',function(err){
-console.log('something terrible happened..');
-	});
-
-};
-
-/**
-*  TCP listening server connection
-* @method TCPserverlisten
-*
-*/
-peerTopeer.prototype.TCPserverlisten = function() {
-
-	var server = net.createServer(function(c) { //'connection' listener
-console.log('client connected');
-
-		c.on('end', function() {
-console.log('client disconnected');
-		});
-
-		c.write('hello from soul 66\r\n');
-		c.pipe(c);
-	});
-
-	server.listen(3333, function() { //'listening' listener
-console.log('server bound');
-	});
-
-};
 
 module.exports = peerTopeer;

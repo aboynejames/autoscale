@@ -10,13 +10,18 @@ contract sensorContract {
   string sensorBrand;
   string sensorMeasure;
   string sensorUnit;
+  address sensorcontract;
 
   mapping (address => uint) owners;
-  // sensorType = {};
 
   function setSensorOwner(address receiver) returns(bool successful) {
   	owners[msg.sender] = 1;
   	return true;
+  }
+
+  function setStorageContract(address adin) {
+
+    sensorcontract = adin;
   }
 
   function setSensorBrand(string x) {
